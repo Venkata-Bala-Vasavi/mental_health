@@ -1,6 +1,5 @@
 flask
 flask-cors
 openai
-textblob
+sqlite3
 python-dotenv
-
