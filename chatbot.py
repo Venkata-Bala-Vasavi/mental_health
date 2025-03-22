@@ -12,8 +12,8 @@ load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 print("OpenAI API Key:", openai.api_key)
 
-if not openai.api_key:
-    raise ValueError("⚠️ Missing OpenAI API key! Add it to the .env file.")
+# if not openai.api_key:
+#     raise ValueError("⚠️ Missing OpenAI API key! Add it to the .env file.")
 app = Flask(__name__)
 CORS(app)  # Enables CORS for frontend communication
 @app.route("/", methods=["GET"])
