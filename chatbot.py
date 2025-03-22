@@ -2,21 +2,17 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import openai
 from textblob import TextBlob
-from dotenv import load_dotenv
-import os
+from dotenv import load_dotenv  # Import dotenv
+import os  # Import os to access env variables
 
-# Load environment variables from .env
+# Load environment variables from .env file
 load_dotenv()
 
-app = Flask(__name__)
-CORS(app)  # Enable CORS for frontend communication
-
-# Get API key from environment variables
+# Get API key from environment variable
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 if not openai.api_key:
     raise ValueError("⚠️ Missing OpenAI API key! Add it to the .env file.")
-
 @app.route("/", methods=["GET"])
 def home():
     return jsonify({"message": "Welcome to the Mental Health AI Chatbot!"})
