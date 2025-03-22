@@ -3,3 +3,4 @@ flask-cors
 openai
 sqlite3
 python-dotenv
+streamlit
