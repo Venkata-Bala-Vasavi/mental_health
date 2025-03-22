@@ -1,83 +1,67 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import openai
-from textblob import TextBlob
-from dotenv import load_dotenv  # Import dotenv
-import os  # Import os to access env variables
+import sqlite3
+from dotenv import load_dotenv
+import os
 
-# Load environment variables from .env file
-load_dotenv()
-
-# Get API key from environment variable
+# Load API Key from `api.env`
+load_dotenv("api.env")  # Explicitly load api.env
 openai.api_key = os.getenv("OPENAI_API_KEY")
-print("OpenAI API Key:", openai.api_key)
 
-# if not openai.api_key:
-#     raise ValueError("⚠️ Missing OpenAI API key! Add it to the .env file.")
+if not openai.api_key:
+    raise ValueError("⚠️ OpenAI API Key Missing! Check your api.env file.")
+
 app = Flask(__name__)
-CORS(app)  # Enables CORS for frontend communication
+CORS(app)
+
+# Initialize SQLite Database
+def init_db():
+    conn = sqlite3.connect("chat_history.db")
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS conversations (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user TEXT,
+                        message TEXT,
+                        response TEXT
+                      )''')
+    conn.commit()
+    conn.close()
+
 @app.route("/", methods=["GET"])
 def home():
-    return jsonify({"message": "Welcome to the Mental Health AI Chatbot!"})
+    return jsonify({"message": "Welcome to the Mental Health Chatbot!"})
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    user_message = request.json.get("message", "").strip()
-    if not user_message:
+    data = request.json
+    user = data.get("user", "Anonymous")  # Default user if not provided
+    message = data.get("message", "").strip()
+
+    if not message:
         return jsonify({"error": "Message is required"}), 400
 
+    # Fetch previous messages from the database
+    conn = sqlite3.connect("chat_history.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT message, response FROM conversations WHERE user=?", (user,))
+    past_conversations = cursor.fetchall()
+    conn.close()
+
+    # Format conversation history for context
+    conversation_history = "\n".join([f"User: {m} \nBot: {r}" for m, r in past_conversations[-5:]])  # Last 5 messages
+
+    # Generate AI Response
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "You are a mental health support AI. Be empathetic and supportive."},
-                {"role": "user", "content": user_message}
+                {"role": "system", "content": "You are a supportive AI therapist who provides comfort."},
+                {"role": "user", "content": f"Past conversations:\n{conversation_history}\n\nNew Message: {message}"}
             ]
         )
-        reply = response["choices"][0]["message"]["content"]
+        bot_reply = response["choices"][0]["message"]["content"]
     except Exception as e:
         return jsonify({"error": f"OpenAI API Error: {str(e)}"}), 500
 
-    return jsonify({"reply": reply})
-
-@app.route("/mood", methods=["POST"])
-def mood_analysis():
-    user_message = request.json.get("message", "").strip()
-    if not user_message:
-        return jsonify({"error": "Message is required"}), 400
-
-    analysis = TextBlob(user_message)
-    polarity = analysis.sentiment.polarity
-
-    if polarity > 0.3:
-        mood = "Positive 😊"
-    elif polarity < -0.3:
-        mood = "Negative 😞"
-    else:
-        mood = "Neutral 😐"
-
-    return jsonify({"mood": mood, "score": polarity})
-
-@app.route("/recommend", methods=["POST"])
-def recommend_help():
-    user_message = request.json.get("message", "").strip()
-    if not user_message:
-        return jsonify({"error": "Message is required"}), 400
-
-    analysis = TextBlob(user_message)
-    polarity = analysis.sentiment.polarity
-
-    if polarity < -0.6:
-        recommendation = "It might help to talk to a therapist. You're not alone. 💙"
-    elif polarity < -0.3:
-        recommendation = "Try practicing mindfulness or talking to a friend. 🧘‍♂️"
-    elif polarity > 0.3:
-        recommendation = "Keep up the positivity! Maybe write down what made you happy today. 🌟"
-    else:
-        recommendation = "You're doing okay! Keep checking in with yourself. 🤗"
-
-    return jsonify({"recommendation": recommendation, "score": polarity})
-
-if __name__ == "__main__":
-    app.run(debug=False, use_reloader=False)
-
+    # Store in database
