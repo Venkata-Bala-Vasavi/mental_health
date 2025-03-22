@@ -79,4 +79,5 @@ def recommend_help():
     return jsonify({"recommendation": recommendation, "score": polarity})
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False, use_reloader=False)
+
